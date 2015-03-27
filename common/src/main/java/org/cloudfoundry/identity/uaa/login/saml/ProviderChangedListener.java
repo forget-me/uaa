@@ -47,19 +47,24 @@ public class ProviderChangedListener implements ApplicationListener<IdentityProv
         }
         IdentityProvider provider = (IdentityProvider)event.getSource();
         if (Origin.SAML.equals(provider.getType())) {
-            ExtendedMetadataDelegate delegate =
-                configurator.addIdentityProviderDefinition(JsonUtils.readValue(provider.getConfig(), IdentityProviderDefinition.class));
-            IdentityZone zone = zoneProvisioning.retrieve(provider.getIdentityZoneId());
-            try {
-                ZoneAwareMetadataManager.ExtensionMetadataManager manager = metadataManager.getManager(zone);
-                manager.addMetadataProvider(delegate);
-                for (MetadataProvider idp : manager.getProviders()) {
-                    idp.getMetadata();
+            if (provider.isActive()) {
+                ExtendedMetadataDelegate delegate =
+                    configurator.addIdentityProviderDefinition(JsonUtils.readValue(provider.getConfig(), IdentityProviderDefinition.class));
+                IdentityZone zone = zoneProvisioning.retrieve(provider.getIdentityZoneId());
+                try {
+                    ZoneAwareMetadataManager.ExtensionMetadataManager manager = metadataManager.getManager(zone);
+                    manager.addMetadataProvider(delegate);
+                    for (MetadataProvider idp : manager.getProviders()) {
+                        idp.getMetadata();
+                    }
+                    manager.refreshMetadata();
+                    metadataManager.getManager(zone).refreshMetadata();
+                } catch (MetadataProviderException e) {
+                    logger.error("Unable to add new IDP provider:",e);
                 }
-                manager.refreshMetadata();
-                metadataManager.getManager(zone).refreshMetadata();
-            } catch (MetadataProviderException e) {
-                logger.error("Unable to add new IDP provider:",e);
+            } else {
+                configurator.removeIdentityProviderDefinition(JsonUtils.readValue(provider.getConfig(), IdentityProviderDefinition.class));
+                // TODO: Refresh MetadataManager?
             }
         }
     }
